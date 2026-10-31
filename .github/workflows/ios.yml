@@ -1,0 +1,38 @@
+name: Build iOS (unsigned IPA)
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unzip source
+        run: unzip -q EchoLab-iOS-source.zip
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate the Xcode project
+        working-directory: EchoLab-iOS
+        run: xcodegen generate
+      - name: Build (unsigned)
+        working-directory: EchoLab-iOS
+        shell: bash
+        run: |
+          xcodebuild -project EchoLab.xcodeproj -scheme EchoLab -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build 2>&1 | tee build.log
+      - name: Package the IPA
+        working-directory: EchoLab-iOS
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/EchoLab.app Payload/
+          zip -qr EchoLab.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EchoLab-iOS-ipa
+          path: EchoLab-iOS/EchoLab.ipa
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: EchoLab-iOS-build-log
+          path: EchoLab-iOS/build.log
